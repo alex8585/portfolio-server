@@ -225,21 +225,38 @@ export const resolvers = {
     },
 
     async editPortfolio(parent, args, context, info) {
-      const { id, tags, uploadedFile } = args
-
-      console.log(args)
-
-      let tagsIds = tags.map((e) => {
-        return e.id
-      })
+      const { id, tags, name, url, order_number, uploadedFile } = args
 
       let update = {
-        ...args,
-        tags: tagsIds,
+        name,
+        url,
+        order_number,
+        tags: tags.map((e) => e.id),
       }
 
-      const result = await Portfolio.updateOne({ _id: id }, update)
-      console.log(result)
+      let portfolio = await Portfolio.findOne({ _id: id }).exec()
+      if (!portfolio) {
+        console.log("Db error")
+      }
+
+      let oldImgUrl = portfolio.img
+      if (uploadedFile) {
+        let tmpFile = getTmpUploadsPath(uploadedFile)
+        let filePath = getUploadsPath() + "portfolios/" + uploadedFile
+        let img = getImgUrl() + "portfolios/" + uploadedFile
+        fs.renameSync(tmpFile, filePath)
+        update.img = img
+      }
+
+      portfolio.set(update).save()
+
+      if (uploadedFile) {
+        let oldPath = pathByUrl(oldImgUrl)
+        fs.unlink(oldPath, function (err) {
+          if (err) return console.log(err)
+        })
+      }
+
       if (result && result.ok > 0) {
         return {
           error: null,
@@ -251,13 +268,6 @@ export const resolvers = {
         error: "Something went wrong",
         success: false,
       }
-
-      // let tmpFile = getTmpUploadsPath(uploadedFile)
-      // let filePath = getUploadsPath() + "portfolios/" + uploadedFile
-      // let img = getImgUrl() + "portfolios/" + uploadedFile
-      // img = img.replace(/^\/+/g, "")
-
-      // fs.renameSync(tmpFile, filePath)
     },
   },
 }

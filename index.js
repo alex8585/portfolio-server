@@ -4,6 +4,12 @@ import { ApolloServer } from "apollo-server-express"
 import dbConnect from "./utils/dbConnect.js"
 import https from "https"
 import express from "express"
+import { applyMiddleware } from "graphql-middleware"
+import permissions from "./apollo/middleware/permissions.js"
+
+import setToken from "./apollo/middleware/setToken.js"
+import setUser from "./apollo/middleware/setUser.js"
+import { makeExecutableSchema } from "@graphql-tools/schema"
 await dbConnect()
 import fs from "fs"
 
@@ -20,7 +26,21 @@ async function startApolloServer() {
     cert: fs.readFileSync(`./ssl/localhost.crt`),
   }
 
-  const appoloServer = new ApolloServer({ typeDefs, resolvers })
+  const schema = makeExecutableSchema({ typeDefs, resolvers })
+
+  const schemaWithMiddleware = applyMiddleware(
+    schema,
+    setToken,
+    setUser,
+    permissions
+  )
+
+  const appoloServer = new ApolloServer({
+    schema: schemaWithMiddleware,
+    context: ({ req }) => {
+      return { headers: req.headers }
+    },
+  })
   await appoloServer.start()
 
   const app = express()
